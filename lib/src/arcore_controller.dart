@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:arcore_flutter_plugin/src/arcore_augmented_image.dart';
 import 'package:arcore_flutter_plugin/src/arcore_rotating_node.dart';
 import 'package:arcore_flutter_plugin/src/utils/vector_utils.dart';
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'arcore_hit_test_result.dart';
 import 'arcore_node.dart';
@@ -38,9 +41,11 @@ class ArCoreController {
       this.debug = false
 //    @required this.onUnsupported,
       }) {
-    _channel = MethodChannel('arcore_flutter_plugin_$id');
-    _channel.setMethodCallHandler(_handleMethodCalls);
+    print("IDD:::  $id");
     init();
+    _channel = MethodChannel('arcore_view_$id');
+    _channel.setMethodCallHandler(_handleMethodCalls);
+    print("IDDD:::  $id");
   }
 
   final int id;
@@ -49,6 +54,7 @@ class ArCoreController {
   final bool? enablePlaneRenderer;
   final bool? debug;
   late MethodChannel _channel;
+
   StringResultHandler? onError;
   StringResultHandler? onNodeTap;
 
@@ -59,14 +65,16 @@ class ArCoreController {
   ArCoreAugmentedImageTrackingHandler? onTrackingImage;
 
   init() async {
+    print('ArCoreController init() called');
     try {
       await _channel.invokeMethod<void>('init', {
         'enableTapRecognizer': enableTapRecognizer,
         'enablePlaneRenderer': enablePlaneRenderer,
         'enableUpdateListener': enableUpdateListener,
       });
+      print('ArCoreController init() completed');
     } on PlatformException catch (ex) {
-      print(ex.message);
+      print('ArCoreController init() error: ${ex.message}');
     }
   }
 
@@ -148,6 +156,39 @@ class ArCoreController {
 
   Future<dynamic> getTrackingState() async {
     return _channel.invokeMethod('getTrackingState');
+  }
+
+  Future<void> sendModelPathToNative(String path) async {
+    final byteData = await rootBundle.load('assets/model.glb');
+
+    // Copy to temp folder
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$path');
+    await file.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
+
+    // Send path to Android via MethodChannel
+    const channel = MethodChannel('com.example.yourplugin/arcore');
+    await channel.invokeMethod('loadGlbFromPath', {
+      'path': file.path,
+      'position': {'x': 0.0, 'y': 0.0, 'z': -1.0}, // optional world position
+    });
+  }
+
+  Future<Map> hitTest(
+      double x, double y, double screenWidth, double screenHeight) async {
+    final result = await _channel.invokeMethod('hitTest', {
+      "x": x,
+      "y": y,
+      "screenWidth": screenWidth,
+      "screenHeight": screenHeight
+    });
+    return result;
+  }
+
+  Future<Map> toWorldCordinate(double x, double y, double depth) async {
+    final result = await _channel
+        .invokeMethod('toWorldCordinate', {"x": x, "y": y, "depth": depth});
+    return result;
   }
 
   addArCoreNodeToAugmentedImage(ArCoreNode node, int index,

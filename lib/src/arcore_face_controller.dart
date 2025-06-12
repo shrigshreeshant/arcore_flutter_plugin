@@ -5,7 +5,7 @@ import '../arcore_flutter_plugin.dart';
 class ArCoreFaceController {
   ArCoreFaceController(
       {int? id, this.enableAugmentedFaces, this.debug = false}) {
-    _channel = MethodChannel('arcore_flutter_plugin_$id');
+    _channel = MethodChannel('$id');
     _channel.setMethodCallHandler(_handleMethodCalls);
     init();
   }
